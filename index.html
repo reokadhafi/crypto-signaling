@@ -93,7 +93,7 @@ function detectCross(pk,pd,ck,cd){
   if(pk> pd && ck<cd) return 'bear';
   return null;
 }
-async function fetchKlines(tf,limit=200){
+async function fetchKlines(tf,limit=50){
   const url=`https://api.binance.com/api/v3/klines?symbol=PEPEUSDT&interval=${tf}&limit=${limit}`;
   const res=await fetch(url);const data=await res.json();
   return {
@@ -107,18 +107,20 @@ function tsLabel(ts){return new Date(ts).toLocaleString();}
 let chart;
 let lastCrossState = null;
 async function buildChart(tf){
-  const {openTime,highs,lows,closes}=await fetchKlines(tf);
+  const {openTime,highs,lows,closes}=await fetchKlines(tf,50);
   const {K,D,J}=computeKDJ(highs,lows,closes);
   const labels=openTime.map(tsLabel);
   if(chart)chart.destroy();
   chart=new Chart(document.getElementById('chart').getContext('2d'),{
     type:'line',
     data:{labels,datasets:[
-      {label:'K',data:K,borderColor:'#58a6ff',pointRadius:0},
-      {label:'D',data:D,borderColor:'#f78166',pointRadius:0},
-      {label:'J',data:J,borderColor:'#3fb950',borderDash:[5,5],pointRadius:0}
+      {label:'K',data:K,borderColor:'#58a6ff',pointRadius:0,borderWidth:2},
+      {label:'D',data:D,borderColor:'#f78166',pointRadius:0,borderWidth:2},
+      {label:'J',data:J,borderColor:'#3fb950',borderDash:[5,5],pointRadius:0,borderWidth:2},
+      {label:'Overbought',data:Array(K.length).fill(80),borderColor:'#8b949e',borderWidth:1,borderDash:[2,2],pointRadius:0},
+      {label:'Oversold',data:Array(K.length).fill(20),borderColor:'#8b949e',borderWidth:1,borderDash:[2,2],pointRadius:0}
     ]},
-    options:{animation:false,plugins:{legend:{labels:{color:'#c9d1d9'}}},scales:{x:{ticks:{color:'#8b949e'}},y:{ticks:{color:'#8b949e'}}}}
+    options:{animation:false,plugins:{legend:{labels:{color:'#c9d1d9'}}},scales:{x:{ticks:{color:'#8b949e',maxTicksLimit:10}},y:{ticks:{color:'#8b949e'},min:0,max:100}}}
   });
   const last=K.length-1;
   const cross=detectCross(K[last-1],D[last-1],K[last],D[last]);
@@ -156,3 +158,4 @@ setInterval(()=>buildChart(document.getElementById('timeframe').value),30000);
 </script>
 </body>
 </html>
+

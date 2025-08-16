@@ -40,6 +40,7 @@ canvas { background: #0d1117; }
 let audioEnabled = true;
 let audioCtx;
 let beepInterval = null;
+let lastCrossState = null;
 function beep(durationMs=200,freq=880){
   if(!audioEnabled)return;
   if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
@@ -53,6 +54,7 @@ function beep(durationMs=200,freq=880){
   o.start();o.stop(now+durationMs/1000);
 }
 function startBeepLoop(){
+  if(!audioEnabled) return;
   if(beepInterval) return;
   beepInterval = setInterval(()=>beep(), 500);
 }
@@ -103,13 +105,11 @@ async function fetchKlines(tf,limit=50){
     closes:data.map(d=>+d[4])
   };
 }
-function tsLabel(ts){return new Date(ts).toLocaleString();}
 let chart;
-let lastCrossState = null;
 async function buildChart(tf){
   const {openTime,highs,lows,closes}=await fetchKlines(tf,50);
   const {K,D,J}=computeKDJ(highs,lows,closes);
-  const labels=openTime.map(tsLabel);
+  const labels=openTime.map(()=>""); // Hilangkan label tanggal/jam
   if(chart)chart.destroy();
   chart=new Chart(document.getElementById('chart').getContext('2d'),{
     type:'line',
@@ -120,7 +120,7 @@ async function buildChart(tf){
       {label:'Overbought',data:Array(K.length).fill(80),borderColor:'#8b949e',borderWidth:1,borderDash:[2,2],pointRadius:0},
       {label:'Oversold',data:Array(K.length).fill(20),borderColor:'#8b949e',borderWidth:1,borderDash:[2,2],pointRadius:0}
     ]},
-    options:{animation:false,plugins:{legend:{labels:{color:'#c9d1d9'}}},scales:{x:{ticks:{color:'#8b949e',maxTicksLimit:10}},y:{ticks:{color:'#8b949e'},min:0,max:100}}}
+    options:{animation:false,plugins:{legend:{labels:{color:'#c9d1d9'}}},scales:{x:{ticks:{color:'#8b949e'}},y:{ticks:{color:'#8b949e'},min:0,max:100}}}
   });
   const last=K.length-1;
   const cross=detectCross(K[last-1],D[last-1],K[last],D[last]);
@@ -150,7 +150,14 @@ function startPriceWS(){
   ws.onclose=()=>setTimeout(startPriceWS,3000);
 }
 document.getElementById('timeframe').addEventListener('change',e=>buildChart(e.target.value));
-document.getElementById('muteToggle').addEventListener('change',e=>{audioEnabled=!e.target.checked; if(!audioEnabled) stopBeepLoop();});
+document.getElementById('muteToggle').addEventListener('change',e=>{
+  audioEnabled=!e.target.checked;
+  if(!audioEnabled) {
+    stopBeepLoop();
+  } else if(lastCrossState) {
+    startBeepLoop();
+  }
+});
 document.getElementById('testBeep').addEventListener('click',()=>{beep();});
 startPriceWS();
 buildChart(document.getElementById('timeframe').value);
@@ -158,4 +165,3 @@ setInterval(()=>buildChart(document.getElementById('timeframe').value),30000);
 </script>
 </body>
 </html>
-

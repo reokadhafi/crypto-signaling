@@ -137,7 +137,6 @@
     };
 
     let currentSignal = null;
-    let klineWS = null; // simpan websocket kline
 
     async function fetchKlines(tf) {
       const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=PEPEUSDT&interval=${tf}&limit=50`);
@@ -230,18 +229,7 @@
       `;
     }
 
-    function subscribeKline(tf) {
-      if (klineWS) klineWS.close(); // tutup ws lama
-      klineWS = new WebSocket(`wss://stream.binance.com:9443/ws/pepeusdt@kline_${tf}`);
-      klineWS.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.k.x) { // candle close
-          updateChart(tf);
-        }
-      };
-    }
-
-    // Harga realtime tetap dari trade-stream
+    // harga realtime
     let priceEl = document.getElementById('price');
     const ws = new WebSocket('wss://stream.binance.com:9443/ws/pepeusdt@trade');
     ws.onmessage = (event) => {
@@ -249,16 +237,21 @@
       priceEl.textContent = 'Harga Terkini: ' + parseFloat(data.p).toFixed(8) + ' USDT';
     };
 
-    // Ganti timeframe
+    // ganti timeframe manual
     document.getElementById('timeframe').onchange = (e) => {
       const tf = e.target.value;
       updateChart(tf);
-      subscribeKline(tf);
     };
 
     // pertama kali jalan
-    updateChart('15m');
-    subscribeKline('15m');
+    let currentTF = '15m';
+    updateChart(currentTF);
+
+    // auto update tiap 30 detik
+    setInterval(() => {
+      currentTF = document.getElementById('timeframe').value;
+      updateChart(currentTF);
+    }, 30000);
   </script>
 </body>
 </html>

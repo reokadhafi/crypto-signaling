@@ -11,6 +11,10 @@ body { font-family: 'Segoe UI', Roboto, sans-serif; padding: 1rem; background: #
 select, button, input[type=checkbox] { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 0.3rem 0.6rem; }
 button:hover, select:hover { background: #30363d; cursor: pointer; }
 canvas { background: #0d1117; }
+.signal-box { display:inline-block; padding:0.5rem 1rem; border-radius:8px; font-weight:bold; animation: blink 1s infinite; }
+.signal-buy { background:#238636; color:white; }
+.signal-sell { background:#da3633; color:white; }
+@keyframes blink { 50% { opacity: 0; } }
 </style>
 </head>
 <body>
@@ -31,6 +35,7 @@ canvas { background: #0d1117; }
 </div>
 <canvas id="chart" height="280"></canvas>
 <div id="info" style="margin-top:1rem;"></div>
+<div id="signal" style="margin-top:1rem;"></div>
 <script>
 let audioEnabled = true;
 let audioCtx;
@@ -119,14 +124,21 @@ async function buildChart(tf){
   const cross=detectCross(K[last-1],D[last-1],K[last],D[last]);
   const info=document.getElementById('info');
   info.textContent=`K:${K[last]?.toFixed(2)} D:${D[last]?.toFixed(2)} J:${J[last]?.toFixed(2)} Sinyal:${cross||'—'}`;
+  const signalBox=document.getElementById('signal');
   if(cross){
     if(lastCrossState!==cross){
       lastCrossState = cross;
       startBeepLoop();
     }
+    if(cross==='bull'){
+      signalBox.innerHTML='<div class="signal-box signal-buy">BUY</div>';
+    } else {
+      signalBox.innerHTML='<div class="signal-box signal-sell">SELL</div>';
+    }
   } else {
     lastCrossState = null;
     stopBeepLoop();
+    signalBox.innerHTML='';
   }
 }
 function startPriceWS(){

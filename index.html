@@ -38,13 +38,8 @@
       border: none;
       font-size: 0.9rem;
     }
-    button {
-      cursor: pointer;
-    }
-    #price {
-      margin-top: 0.5rem;
-      font-size: 1rem;
-    }
+    button { cursor: pointer; }
+    #price { margin-top: 0.5rem; font-size: 1rem; }
     #info {
       margin-top: 0.5rem;
       font-size: 1rem;
@@ -76,13 +71,8 @@
       50% { opacity: 0; }
       100% { opacity: 1; }
     }
-    .chart-container {
-      position: relative;
-      height: 300px;
-    }
-    canvas {
-      max-width: 100%;
-    }
+    .chart-container { position: relative; height: 300px; }
+    canvas { max-width: 100%; }
   </style>
 </head>
 <body>
@@ -112,11 +102,10 @@
     const ctx = document.getElementById('chart').getContext('2d');
     let chart;
 
-    // Buat audio beep
+    // Audio
     let audioCtx;
     let beepInterval;
     let audioEnabled = true;
-
     function startBeepLoop() {
       if (!audioEnabled || beepInterval) return;
       beepInterval = setInterval(() => beep(), 500);
@@ -139,19 +128,16 @@
       oscillator.start();
       oscillator.stop(audioCtx.currentTime + 0.1);
     }
-
     document.getElementById('testBeep').onclick = () => beep();
     document.getElementById('muteToggle').onclick = () => {
       audioEnabled = !audioEnabled;
       document.getElementById('muteToggle').textContent = audioEnabled ? '🔊' : '🔇';
-      if (!audioEnabled) {
-        stopBeepLoop();
-      } else {
-        if (currentSignal !== null) startBeepLoop();
-      }
+      if (!audioEnabled) stopBeepLoop();
+      else if (currentSignal !== null) startBeepLoop();
     };
 
     let currentSignal = null;
+    let klineWS = null; // simpan websocket kline
 
     async function fetchKlines(tf) {
       const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=PEPEUSDT&interval=${tf}&limit=50`);
@@ -161,13 +147,10 @@
     function calculateKDJ(data) {
       let RSV = [], K = [], D = [], J = [];
       let n = 9;
-      let prevK = 50, prevD = 50; // mulai dari 50
+      let prevK = 50, prevD = 50;
       for (let i = 0; i < data.length; i++) {
         if (i < n) {
-          RSV.push(null);
-          K.push(null);
-          D.push(null);
-          J.push(null);
+          RSV.push(null); K.push(null); D.push(null); J.push(null);
           continue;
         }
         let slice = data.slice(i - n, i);
@@ -247,15 +230,35 @@
       `;
     }
 
-    document.getElementById('timeframe').onchange = (e) => updateChart(e.target.value);
-    updateChart('15m');
+    function subscribeKline(tf) {
+      if (klineWS) klineWS.close(); // tutup ws lama
+      klineWS = new WebSocket(`wss://stream.binance.com:9443/ws/pepeusdt@kline_${tf}`);
+      klineWS.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.k.x) { // candle close
+          updateChart(tf);
+        }
+      };
+    }
 
+    // Harga realtime tetap dari trade-stream
     let priceEl = document.getElementById('price');
     const ws = new WebSocket('wss://stream.binance.com:9443/ws/pepeusdt@trade');
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       priceEl.textContent = 'Harga Terkini: ' + parseFloat(data.p).toFixed(8) + ' USDT';
     };
+
+    // Ganti timeframe
+    document.getElementById('timeframe').onchange = (e) => {
+      const tf = e.target.value;
+      updateChart(tf);
+      subscribeKline(tf);
+    };
+
+    // pertama kali jalan
+    updateChart('15m');
+    subscribeKline('15m');
   </script>
 </body>
 </html>

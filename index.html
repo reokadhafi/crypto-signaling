@@ -1,167 +1,259 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>KDJ PEPE/USDT Realtime (Custom TF)</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<style>
-body { font-family: 'Segoe UI', Roboto, sans-serif; padding: 1rem; background: #0d1117; color: #c9d1d9; }
-.card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
-select, button, input[type=checkbox] { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 0.3rem 0.6rem; }
-button:hover, select:hover { background: #30363d; cursor: pointer; }
-canvas { background: #0d1117; }
-.signal-box { display:inline-block; padding:0.5rem 1rem; border-radius:8px; font-weight:bold; animation: blink 1s infinite; }
-.signal-buy { background:#238636; color:white; }
-.signal-sell { background:#da3633; color:white; }
-@keyframes blink { 50% { opacity: 0; } }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KDJ PEPE/USDT Realtime</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #121212;
+      color: #fff;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .card {
+      background: #1e1e1e;
+      padding: 1rem;
+      border-radius: 1rem;
+      margin: 1rem;
+      width: 95%;
+      max-width: 600px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    select, button {
+      padding: 0.4rem 0.8rem;
+      border-radius: 0.5rem;
+      border: none;
+      font-size: 0.9rem;
+    }
+    button {
+      cursor: pointer;
+    }
+    #price {
+      margin-top: 0.5rem;
+      font-size: 1rem;
+    }
+    #info {
+      margin-top: 0.5rem;
+      font-size: 1rem;
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+    }
+    .infoBox {
+      padding: 0.3rem 0.6rem;
+      border-radius: 0.3rem;
+      font-weight: bold;
+      color: #fff;
+    }
+    .infoK { background: blue; }
+    .infoD { background: orange; }
+    .infoJ { background: green; }
+    #signalBox {
+      margin-top: 0.5rem;
+      padding: 0.5rem 1rem;
+      font-size: 1.5rem;
+      font-weight: bold;
+      border-radius: 0.5rem;
+      display: none;
+      animation: blink 1s infinite;
+      text-align: center;
+    }
+    @keyframes blink {
+      0% { opacity: 1; }
+      50% { opacity: 0; }
+      100% { opacity: 1; }
+    }
+    .chart-container {
+      position: relative;
+      height: 300px;
+    }
+    canvas {
+      max-width: 100%;
+    }
+  </style>
 </head>
 <body>
-<div class="card">
-  <label>Pilih Timeframe:
-    <select id="timeframe">
-      <option value="1m">1m</option>
-      <option value="5m">5m</option>
-      <option value="15m" selected>15m</option>
-      <option value="4h">4h</option>
-    </select>
-  </label>
-  <label style="margin-left:1rem;">
-    <input type="checkbox" id="muteToggle"> Matikan bunyi
-  </label>
-  <button id="testBeep" style="margin-left:1rem;">Test Bunyi</button>
-  <div style="margin-top:0.5rem;">Harga Terkini: <span id="livePrice">—</span> USDT</div>
-</div>
-<canvas id="chart" height="280"></canvas>
-<div id="info" style="margin-top:1rem;"></div>
-<div id="signal" style="margin-top:1rem;"></div>
-<script>
-let audioEnabled = true;
-let audioCtx;
-let beepInterval = null;
-let lastCrossState = null;
-function beep(durationMs=200,freq=880){
-  if(!audioEnabled)return;
-  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-  const o=audioCtx.createOscillator();
-  const g=audioCtx.createGain();
-  o.type='sine';o.frequency.value=freq;o.connect(g);g.connect(audioCtx.destination);
-  const now=audioCtx.currentTime;
-  g.gain.setValueAtTime(0.001,now);
-  g.gain.exponentialRampToValueAtTime(0.2,now+0.01);
-  g.gain.exponentialRampToValueAtTime(0.001,now+durationMs/1000);
-  o.start();o.stop(now+durationMs/1000);
-}
-function startBeepLoop(){
-  if(!audioEnabled) return;
-  if(beepInterval) return;
-  beepInterval = setInterval(()=>beep(), 500);
-}
-function stopBeepLoop(){
-  if(beepInterval){
-    clearInterval(beepInterval);
-    beepInterval = null;
-  }
-}
-function computeKDJ(highs,lows,closes,n=9){
-  const rsv=Array(closes.length).fill(null);
-  for(let i=0;i<closes.length;i++){
-    if(i<n-1)continue;
-    let hh=-Infinity,ll=Infinity;
-    for(let j=i-n+1;j<=i;j++){
-      hh=Math.max(hh,highs[j]);
-      ll=Math.min(ll,lows[j]);
+  <div class="card">
+    <div class="controls">
+      <label for="timeframe">Pilih Timeframe:</label>
+      <select id="timeframe">
+        <option value="1m">1m</option>
+        <option value="5m">5m</option>
+        <option value="15m" selected>15m</option>
+        <option value="4h">4h</option>
+      </select>
+      <button id="muteToggle">🔊</button>
+      <button id="testBeep">Test Bunyi</button>
+    </div>
+    <div id="price">Harga Terkini: -</div>
+    <div class="chart-container">
+      <canvas id="chart"></canvas>
+    </div>
+    <div id="info"></div>
+    <div id="signalBox"></div>
+  </div>
+
+  <script>
+    const ctx = document.getElementById('chart').getContext('2d');
+    let chart;
+
+    // Buat audio beep
+    let audioCtx;
+    let beepInterval;
+    let audioEnabled = true;
+
+    function startBeepLoop() {
+      if (!audioEnabled || beepInterval) return;
+      beepInterval = setInterval(() => beep(), 500);
     }
-    const denom=hh-ll;
-    rsv[i]=denom===0?0:((closes[i]-ll)/denom)*100;
-  }
-  const K=Array(closes.length).fill(null);
-  const D=Array(closes.length).fill(null);
-  const J=Array(closes.length).fill(null);
-  let kPrev=50,dPrev=50;
-  for(let i=0;i<closes.length;i++){
-    if(rsv[i]==null)continue;
-    const k=(2/3)*kPrev+(1/3)*rsv[i];
-    const d=(2/3)*dPrev+(1/3)*k;
-    const j=3*k-2*d;
-    K[i]=k;D[i]=d;J[i]=j;kPrev=k;dPrev=d;
-  }
-  return {K,D,J};
-}
-function detectCross(pk,pd,ck,cd){
-  if(pk==null||pd==null||ck==null||cd==null)return null;
-  if(pk< pd && ck>cd) return 'bull';
-  if(pk> pd && ck<cd) return 'bear';
-  return null;
-}
-async function fetchKlines(tf,limit=50){
-  const url=`https://api.binance.com/api/v3/klines?symbol=PEPEUSDT&interval=${tf}&limit=${limit}`;
-  const res=await fetch(url);const data=await res.json();
-  return {
-    openTime:data.map(d=>d[0]),
-    highs:data.map(d=>+d[2]),
-    lows:data.map(d=>+d[3]),
-    closes:data.map(d=>+d[4])
-  };
-}
-let chart;
-async function buildChart(tf){
-  const {openTime,highs,lows,closes}=await fetchKlines(tf,50);
-  const {K,D,J}=computeKDJ(highs,lows,closes);
-  const labels=openTime.map(()=>""); // Hilangkan label tanggal/jam
-  if(chart)chart.destroy();
-  chart=new Chart(document.getElementById('chart').getContext('2d'),{
-    type:'line',
-    data:{labels,datasets:[
-      {label:'K',data:K,borderColor:'#58a6ff',pointRadius:0,borderWidth:2},
-      {label:'D',data:D,borderColor:'#f78166',pointRadius:0,borderWidth:2},
-      {label:'J',data:J,borderColor:'#3fb950',borderDash:[5,5],pointRadius:0,borderWidth:2},
-      {label:'Overbought',data:Array(K.length).fill(80),borderColor:'#8b949e',borderWidth:1,borderDash:[2,2],pointRadius:0},
-      {label:'Oversold',data:Array(K.length).fill(20),borderColor:'#8b949e',borderWidth:1,borderDash:[2,2],pointRadius:0}
-    ]},
-    options:{animation:false,plugins:{legend:{labels:{color:'#c9d1d9'}}},scales:{x:{ticks:{color:'#8b949e'}},y:{ticks:{color:'#8b949e'},min:0,max:100}}}
-  });
-  const last=K.length-1;
-  const cross=detectCross(K[last-1],D[last-1],K[last],D[last]);
-  const info=document.getElementById('info');
-  info.textContent=`K:${K[last]?.toFixed(2)} D:${D[last]?.toFixed(2)} J:${J[last]?.toFixed(2)} Sinyal:${cross||'—'}`;
-  const signalBox=document.getElementById('signal');
-  if(cross){
-    if(lastCrossState!==cross){
-      lastCrossState = cross;
-      startBeepLoop();
+    function stopBeepLoop() {
+      if (beepInterval) {
+        clearInterval(beepInterval);
+        beepInterval = null;
+      }
     }
-    if(cross==='bull'){
-      signalBox.innerHTML='<div class="signal-box signal-buy">BUY</div>';
-    } else {
-      signalBox.innerHTML='<div class="signal-box signal-sell">SELL</div>';
+    function beep() {
+      if (!audioEnabled) return;
+      if (!audioCtx || audioCtx.state === 'closed') {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const oscillator = audioCtx.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime);
+      oscillator.connect(audioCtx.destination);
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.1);
     }
-  } else {
-    lastCrossState = null;
-    stopBeepLoop();
-    signalBox.innerHTML='';
-  }
-}
-function startPriceWS(){
-  const priceEl=document.getElementById('livePrice');
-  const ws=new WebSocket('wss://stream.binance.com:9443/ws/pepeusdt@trade');
-  ws.onmessage=(ev)=>{const msg=JSON.parse(ev.data);if(msg.p)priceEl.textContent=parseFloat(msg.p).toLocaleString(undefined,{maximumFractionDigits:10});};
-  ws.onclose=()=>setTimeout(startPriceWS,3000);
-}
-document.getElementById('timeframe').addEventListener('change',e=>buildChart(e.target.value));
-document.getElementById('muteToggle').addEventListener('change',e=>{
-  audioEnabled=!e.target.checked;
-  if(!audioEnabled) {
-    stopBeepLoop();
-  } else if(lastCrossState) {
-    startBeepLoop();
-  }
-});
-document.getElementById('testBeep').addEventListener('click',()=>{beep();});
-startPriceWS();
-buildChart(document.getElementById('timeframe').value);
-setInterval(()=>buildChart(document.getElementById('timeframe').value),30000);
-</script>
+
+    document.getElementById('testBeep').onclick = () => beep();
+    document.getElementById('muteToggle').onclick = () => {
+      audioEnabled = !audioEnabled;
+      document.getElementById('muteToggle').textContent = audioEnabled ? '🔊' : '🔇';
+      if (!audioEnabled) {
+        stopBeepLoop();
+      } else {
+        if (currentSignal !== null) startBeepLoop();
+      }
+    };
+
+    let currentSignal = null;
+
+    async function fetchKlines(tf) {
+      const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=PEPEUSDT&interval=${tf}&limit=50`);
+      return res.json();
+    }
+
+    function calculateKDJ(data) {
+      let RSV = [], K = [], D = [], J = [];
+      let n = 9;
+      let prevK = 50, prevD = 50; // mulai dari 50
+      for (let i = 0; i < data.length; i++) {
+        if (i < n) {
+          RSV.push(null);
+          K.push(null);
+          D.push(null);
+          J.push(null);
+          continue;
+        }
+        let slice = data.slice(i - n, i);
+        let low = Math.min(...slice.map(d => parseFloat(d[3])));
+        let high = Math.max(...slice.map(d => parseFloat(d[2])));
+        let close = parseFloat(data[i][4]);
+        let rsv = ((close - low) / (high - low)) * 100;
+        RSV.push(rsv);
+
+        prevK = (2/3 * prevK) + (1/3 * rsv);
+        prevD = (2/3 * prevD) + (1/3 * prevK);
+
+        K.push(prevK);
+        D.push(prevD);
+        J.push(3*prevK - 2*prevD);
+      }
+      return {K,D,J};
+    }
+
+    async function updateChart(tf) {
+      const data = await fetchKlines(tf);
+      const {K,D,J} = calculateKDJ(data);
+      const labels = data.map((_,i) => i + 1);
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {label: 'K', data: K, borderColor: 'blue', borderWidth: 2, fill:false, pointRadius:0},
+            {label: 'D', data: D, borderColor: 'orange', borderWidth: 2, fill:false, pointRadius:0},
+            {label: 'J', data: J, borderColor: 'green', borderWidth: 2, borderDash: [5,5], fill:false, pointRadius:0},
+            {label: 'Overbought', data: Array(labels.length).fill(80), borderColor: 'gray', borderWidth: 1, borderDash: [2,2], pointRadius:0},
+            {label: 'Oversold', data: Array(labels.length).fill(20), borderColor: 'gray', borderWidth: 1, borderDash: [2,2], pointRadius:0}
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { color: '#fff', font: {size: 10} }
+            }
+          },
+          scales: {
+            x: { ticks: { display: false }, grid:{display:false} },
+            y: { min:0, max:100, ticks: { color:'#fff' } }
+          }
+        }
+      });
+
+      let signalBox = document.getElementById('signalBox');
+      let info = document.getElementById('info');
+      let lastK = K[K.length-1], prevK = K[K.length-2];
+      let lastD = D[D.length-1], prevD = D[D.length-2];
+      let signal = null;
+      if (prevK < prevD && lastK > lastD) signal = 'BUY';
+      if (prevK > prevD && lastK < lastD) signal = 'SELL';
+
+      if (signal) {
+        signalBox.style.display = 'block';
+        signalBox.textContent = signal;
+        signalBox.style.background = signal === 'BUY' ? 'green' : 'red';
+        currentSignal = signal;
+        if (audioEnabled) startBeepLoop();
+      } else {
+        signalBox.style.display = 'none';
+        stopBeepLoop();
+        currentSignal = null;
+      }
+
+      info.innerHTML = `
+        <span class="infoBox infoK">K: ${lastK?.toFixed(2)}</span>
+        <span class="infoBox infoD">D: ${lastD?.toFixed(2)}</span>
+        <span class="infoBox infoJ">J: ${J[J.length-1]?.toFixed(2)}</span>
+      `;
+    }
+
+    document.getElementById('timeframe').onchange = (e) => updateChart(e.target.value);
+    updateChart('15m');
+
+    let priceEl = document.getElementById('price');
+    const ws = new WebSocket('wss://stream.binance.com:9443/ws/pepeusdt@trade');
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      priceEl.textContent = 'Harga Terkini: ' + parseFloat(data.p).toFixed(8) + ' USDT';
+    };
+  </script>
 </body>
 </html>
